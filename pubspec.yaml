@@ -1,0 +1,31 @@
+name: ikhwanrozaidi_hoisystem
+description: "Hoi System assessment"
+
+publish_to: "none"
+
+version: 1.0.0+1
+
+environment:
+  sdk: ">=2.16.0 <3.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.2
+  bloc: ^8.1.2
+  flutter_bloc: ^8.1.3
+  flutter_lints: ^2.0.0
+  equatable: ^2.0.5
+  http: ^1.2.0
+  google_fonts: ^6.1.0
+  lottie: ^3.0.0
+  flutter_slidable: ^3.0.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/contact_list.json
