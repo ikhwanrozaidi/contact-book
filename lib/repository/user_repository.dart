@@ -1,7 +1,10 @@
 import 'dart:convert';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 
 import 'package:ikhwanrozaidi_hoisystem/models/user_model.dart';
+
+final userRepoProvider = Provider((ref) => UserRepository());
 
 class UserRepository {
   final String baseUrl = 'https://reqres.in/api';

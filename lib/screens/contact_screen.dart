@@ -2,33 +2,26 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:google_fonts/google_fonts.dart';
-import 'package:lottie/lottie.dart';
+// import 'package:lottie/lottie.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 
-import '../bloc/tab/tab_bloc.dart';
-import '../bloc/tab/tab_event.dart';
-import '../bloc/tab/tab_state.dart';
-import '../bloc/user/user_bloc.dart';
-import '../bloc/user/user_event.dart';
-import '../bloc/user/user_state.dart';
-import '../models/user_model.dart';
-import '../repository/user_repository.dart';
+import '../provider/tab/tab_notifier.dart';
+import '../provider/user/user_notifier.dart';
 import '../widget/addcontact_bottomsheet.dart';
 import 'editprofile_screen.dart';
 import 'profile_screen.dart';
 
-class ContactScreen extends StatefulWidget {
-  final List<User> users;
-
-  ContactScreen({required this.users});
+class ContactScreen extends ConsumerStatefulWidget {
+  ContactScreen({Key? key}) : super(key: key);
 
   @override
   _ContactScreenState createState() => _ContactScreenState();
 }
 
-class _ContactScreenState extends State<ContactScreen> {
+class _ContactScreenState extends ConsumerState<ContactScreen> {
   final TextEditingController _searchController = TextEditingController();
 
   @override
@@ -38,9 +31,7 @@ class _ContactScreenState extends State<ContactScreen> {
   }
 
   void _onSearchChanged() {
-    context
-        .read<UserBloc>()
-        .add(SearchUsers(searchTerm: _searchController.text));
+    ref.read(userNotifierProvider.notifier).searchUsers(_searchController.text);
   }
 
   @override
@@ -52,8 +43,9 @@ class _ContactScreenState extends State<ContactScreen> {
 
   @override
   Widget build(BuildContext context) {
-    double h = MediaQuery.of(context).size.height;
-    Color hoidefault = const Color.fromARGB(255, 50, 186, 165);
+    final userState = ref.watch(userNotifierProvider);
+    // double h = MediaQuery.of(context).size.height;
+    // Color hoidefault = const Color.fromARGB(255, 50, 186, 165);
 
     return Scaffold(
       resizeToAvoidBottomInset: true,
@@ -74,7 +66,7 @@ class _ContactScreenState extends State<ContactScreen> {
               color: Colors.white,
             ),
             onPressed: () {
-              BlocProvider.of<UserBloc>(context).add(FetchAllUsers());
+              ref.read(userNotifierProvider.notifier).fetchAllUsers();
             },
           ),
         ],
@@ -104,184 +96,142 @@ class _ContactScreenState extends State<ContactScreen> {
           ),
           Padding(
             padding: const EdgeInsets.all(15),
-            child: BlocBuilder<TabBloc, TabState>(
-              builder: (context, state) {
+            child: Consumer(
+              builder: (context, ref, child) {
+                final state = ref.watch(tabNotifierProvider);
                 return Row(
                   mainAxisAlignment: MainAxisAlignment.start,
                   children: [
-                    _buildTabButton(context, 'All', 0, state.selectedTabIndex),
+                    _buildTabButton(
+                        context, ref, 'All', 0, state.selectedTabIndex),
                     const SizedBox(width: 15),
                     _buildTabButton(
-                        context, 'Favourite', 1, state.selectedTabIndex),
+                        context, ref, 'Favourite', 1, state.selectedTabIndex),
                   ],
                 );
               },
             ),
           ),
-          Expanded(
-            child: BlocBuilder<TabBloc, TabState>(
-              builder: (context, state) {
-                if (state.selectedTabIndex == 0) {
-                  return BlocBuilder<UserBloc, UserState>(
-                    builder: (context, userState) {
-                      if (userState is UsersLoading) {
-                        return const Center(child: CircularProgressIndicator());
-                      } else if (userState is UsersLoaded) {
-                        return _contactListtile(userState);
-                      } else {
-                        return Column(
-                          children: [
-                            SizedBox(height: 50),
-                            Lottie.asset('assets/contact_list.json',
-                                height: h / 5),
-                            const Text('Sync all your contact to start'),
-                          ],
-                        );
-                      }
-                    },
-                  );
-                } else if (state.selectedTabIndex == 1) {
-                  return BlocBuilder<UserBloc, UserState>(
-                    builder: (context, userState) {
-                      if (userState is UsersLoaded) {
-                        var favoriteUsers = userState.users
-                            .where((user) => user.favourite)
-                            .toList();
-                        if (favoriteUsers.isNotEmpty) {
-                          return ListView.builder(
-                            itemCount: favoriteUsers.length,
-                            itemBuilder: (context, index) {
-                              var user = favoriteUsers[index];
-                              return Slidable(
-                                endActionPane: ActionPane(
-                                  motion: const DrawerMotion(),
-                                  children: [
-                                    SlidableAction(
-                                      onPressed: (BuildContext context) {},
-                                      backgroundColor: Colors.teal.shade300,
-                                      foregroundColor: Colors.white,
-                                      icon: Icons.edit,
-                                      label: 'Edit',
-                                    ),
-                                    SlidableAction(
-                                      onPressed: (BuildContext context) {},
-                                      backgroundColor: Colors.red,
-                                      foregroundColor: Colors.white,
-                                      icon: Icons.delete,
-                                      label: 'Delete',
-                                    ),
-                                  ],
-                                ),
-                                child: ListTile(
-                                  leading: CircleAvatar(
-                                    backgroundImage:
-                                        NetworkImage(user.avatar ?? ''),
-                                  ),
-                                  title: Row(
-                                    children: [
-                                      Text(user.firstName ?? ''),
-                                      const SizedBox(width: 5),
-                                      Icon(
-                                        Icons.star,
-                                        color: user.favourite
-                                            ? Colors.yellow.shade600
-                                            : Colors.transparent,
-                                        size: 12,
-                                      ),
-                                    ],
-                                  ),
-                                  subtitle: Text(user.email ?? ''),
-                                  trailing: const Icon(
-                                    Icons.telegram,
-                                    color: Color.fromARGB(255, 50, 186, 165),
-                                  ),
-                                  onTap: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) => ProfileScreen(
-                                          userId: user.id ?? 0,
-                                          firstname: user.firstName ?? '',
-                                          lastname: user.lastName ?? '',
-                                          email: user.email ?? '',
-                                          imageUrl: user.avatar ?? '',
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                  onLongPress: () {
-                                    showDialog(
-                                      context: context,
-                                      builder: (BuildContext context) {
-                                        return AlertDialog(
-                                          title: Text(user.favourite
-                                              ? 'Remove as Favourite'
-                                              : 'Add as Favourite'),
-                                          content: Text(user.favourite
-                                              ? 'Do you want to remove ${user.firstName} as your favourite contact?'
-                                              : 'Do you want to add ${user.firstName} as your favourite contact?'),
-                                          actions: [
-                                            TextButton(
-                                              onPressed: () =>
-                                                  Navigator.pop(context),
-                                              child: const Text('Cancel'),
-                                            ),
-                                            TextButton(
-                                              onPressed: () {
-                                                Navigator.pop(context);
+          Consumer(builder: (context, ref, child) {
+            final tabState = ref.watch(tabNotifierProvider);
+            final userState = ref.watch(userNotifierProvider);
 
-                                                BlocProvider.of<UserBloc>(
-                                                        context)
-                                                    .add(ToggleUserFavorite(
-                                                        userId: user.id!));
-                                              },
-                                              child: const Text('Yes'),
-                                            ),
-                                          ],
-                                        );
-                                      },
-                                    );
-                                  },
-                                ),
+            if (tabState.selectedTabIndex == 0) {
+              if (userState.users?.isNotEmpty ?? false) {
+                return _contactListtile(userState, ref);
+              } else {
+                return Column(
+                  children: const [
+                    SizedBox(height: 50),
+                    Text('Sync all your contacts to start'),
+                  ],
+                );
+              }
+            } else if (tabState.selectedTabIndex == 1) {
+              var favoriteUsers =
+                  userState.users?.where((user) => user.favourite).toList() ??
+                      [];
+              if (favoriteUsers.isNotEmpty) {
+                return ListView.builder(
+                  itemCount: favoriteUsers.length,
+                  itemBuilder: (context, index) {
+                    var user = favoriteUsers[index];
+                    return Slidable(
+                      endActionPane: ActionPane(
+                        motion: const DrawerMotion(),
+                        children: [
+                          SlidableAction(
+                            onPressed: (BuildContext context) {},
+                            backgroundColor: Colors.teal.shade300,
+                            foregroundColor: Colors.white,
+                            icon: Icons.edit,
+                            label: 'Edit',
+                          ),
+                          SlidableAction(
+                            onPressed: (BuildContext context) {},
+                            backgroundColor: Colors.red,
+                            foregroundColor: Colors.white,
+                            icon: Icons.delete,
+                            label: 'Delete',
+                          ),
+                        ],
+                      ),
+                      child: ListTile(
+                        leading: CircleAvatar(
+                          backgroundImage: NetworkImage(user.avatar ?? ''),
+                        ),
+                        title: Row(
+                          children: [
+                            Text(user.firstName ?? ''),
+                            const SizedBox(width: 5),
+                            Icon(
+                              Icons.star,
+                              color: user.favourite
+                                  ? Colors.yellow.shade600
+                                  : Colors.transparent,
+                              size: 12,
+                            ),
+                          ],
+                        ),
+                        subtitle: Text(user.email ?? ''),
+                        trailing: const Icon(
+                          Icons.telegram,
+                          color: Color.fromARGB(255, 50, 186, 165),
+                        ),
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => ProfileScreen(
+                                userId: user.id ?? 0,
+                                firstname: user.firstName ?? '',
+                                lastname: user.lastName ?? '',
+                                email: user.email ?? '',
+                                imageUrl: user.avatar ?? '',
+                              ),
+                            ),
+                          );
+                        },
+                        onLongPress: () {
+                          showDialog(
+                            context: context,
+                            builder: (BuildContext context) {
+                              return AlertDialog(
+                                title: Text(user.favourite
+                                    ? 'Remove as Favourite'
+                                    : 'Add as Favourite'),
+                                content: Text(user.favourite
+                                    ? 'Do you want to remove ${user.firstName} as your favourite contact?'
+                                    : 'Do you want to add ${user.firstName} as your favourite contact?'),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(context),
+                                    child: const Text('Cancel'),
+                                  ),
+                                  TextButton(
+                                    onPressed: () {
+                                      Navigator.pop(context);
+
+                                      ref
+                                          .read(userNotifierProvider.notifier)
+                                          .toggleUserFavorite(user.id!);
+                                    },
+                                    child: const Text('Yes'),
+                                  ),
+                                ],
                               );
                             },
                           );
-                        } else {
-                          return Column(
-                            children: [
-                              SizedBox(height: 50),
-                              Lottie.asset('assets/contact_list.json',
-                                  height: h / 5),
-                              const Text(
-                                  'Add to Favourite by long press the contact'),
-                            ],
-                          );
-                        }
-                      } else {
-                        return Column(
-                          children: [
-                            SizedBox(height: 50),
-                            Lottie.asset('assets/contact_list.json',
-                                height: h / 5),
-                            const Text(
-                                'Add to Favourite by long press the contact'),
-                          ],
-                        );
-                      }
-                    },
-                  );
-                } else {
-                  return Column(
-                    children: [
-                      SizedBox(height: 50),
-                      Lottie.asset('assets/contact_list.json', height: h / 5),
-                      const Text('Sync all your contact for start'),
-                    ],
-                  );
-                }
-              },
-            ),
-          ),
+                        },
+                      ),
+                    );
+                  },
+                );
+              }
+            }
+
+            return Text('Page 404');
+          }),
         ],
       ),
       floatingActionButton: FloatingActionButton(
@@ -294,12 +244,12 @@ class _ContactScreenState extends State<ContactScreen> {
             },
           );
         },
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(50.0)),
         child: const Icon(
           Icons.add,
           color: Colors.white,
         ),
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(50.0)),
       ),
     );
   }
@@ -323,7 +273,7 @@ class _ContactScreenState extends State<ContactScreen> {
         ),
       ),
       onPressed: () {
-        BlocProvider.of<TabBloc>(context).add(TabUpdated(index));
+        ref.read(tabNotifierProvider.notifier).updateTab(index);
       },
     );
   }
@@ -360,8 +310,9 @@ class _ContactScreenState extends State<ContactScreen> {
               SlidableAction(
                 onPressed: (BuildContext context) {
                   if (user.id != null) {
-                    final userBloc = BlocProvider.of<UserBloc>(context);
-                    userBloc.add(DeleteUserEvent(user.id!));
+                    ref
+                        .read(userNotifierProvider.notifier)
+                        .deleteUser(user.id!);
                   } else {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
@@ -433,9 +384,8 @@ class _ContactScreenState extends State<ContactScreen> {
                       TextButton(
                         onPressed: () {
                           Navigator.pop(context);
-
-                          BlocProvider.of<UserBloc>(context)
-                              .add(ToggleUserFavorite(userId: user.id!));
+                          // BlocProvider.of<UserBloc>(context)
+                          //     .add(ToggleUserFavorite(userId: user.id!));
                         },
                         child: const Text('Yes'),
                       ),
